@@ -22,7 +22,7 @@ from radich.persistence.checkpoints import PostgresCheckpointStore
 from radich.recovery import RecoverableScheduler
 
 run_id, mode = sys.argv[1:]
-with psycopg.connect(os.environ["RADICH_TEST_DATABASE_URL"]) as conn:
+with psycopg.connect(os.environ["RADICH_TEST_DATABASE_URL"], autocommit=True) as conn:
     store = PostgresCheckpointStore(conn)
     store.initialize_schema()
     handlers = demo_handlers()
@@ -50,7 +50,7 @@ with psycopg.connect(os.environ["RADICH_TEST_DATABASE_URL"]) as conn:
     second = subprocess.run([sys.executable, "-c", script, run_id, "resume"],
                             env=env, capture_output=True, text=True, timeout=30)
     assert second.returncode == 0, second.stderr
-    with psycopg.connect(dsn) as conn:
+    with psycopg.connect(dsn, autocommit=True) as conn:
         from radich.persistence.checkpoints import PostgresCheckpointStore
         checkpoint = PostgresCheckpointStore(conn).load(run_id)
     assert checkpoint.execution_order == ("extract", "validate", "summarize")
