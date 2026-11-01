@@ -1,0 +1,48 @@
+# RADICH M15.2 — Linux / Hetzner; no Windows deployment.
+services:
+  radich:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      RADICH_API_KEY: ${RADICH_API_KEY:?Set RADICH_API_KEY in the server environment}
+      DATABASE_URL: postgresql://radich:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/radich
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      # Loopback only. HTTPS reverse proxy is a later deployment task.
+      - "127.0.0.1:8000:8000"
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: radich
+      POSTGRES_DB: radich
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U radich -d radich"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+networks:
+  backend:
+    internal: true
+
+volumes:
+  postgres_data:
