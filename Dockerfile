@@ -17,7 +17,4 @@ RUN python -m pip install --no-cache-dir ".[api,postgres]" \
 USER radich
 EXPOSE 8000
 
-# The ASGI application factory requires an injected runner and repository.
-# M15.2 will supply the production application entrypoint and Compose wiring.
-# Do not run uvicorn against radich.api:create_app without those dependencies.
-CMD ["python", "-c", "import radich, radich.api; print('RADICH image ready; M15.2 entrypoint pending')"]
+# Start the injected, PostgreSQL-backed ASGI application factory.\nCMD ["uvicorn", "radich.deployment:build_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]\n
