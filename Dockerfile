@@ -17,4 +17,5 @@ RUN python -m pip install --no-cache-dir ".[api,postgres]" \
 USER radich
 EXPOSE 8000
 
-# Start the injected, PostgreSQL-backed ASGI application factory.\nCMD ["uvicorn", "radich.deployment:build_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]\n
+# Start the injected, PostgreSQL-backed ASGI application factory.
+CMD ["uvicorn", "radich.deployment:build_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
