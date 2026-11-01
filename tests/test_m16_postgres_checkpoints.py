@@ -16,7 +16,7 @@ def store():
     url = os.getenv("RADICH_TEST_DATABASE_URL") or os.getenv("TEST_DATABASE_URL")
     if not url:
         pytest.skip("PostgreSQL integration requires RADICH_TEST_DATABASE_URL")
-    with psycopg.connect(url) as conn:
+    with psycopg.connect(url, autocommit=True) as conn:
         result = PostgresCheckpointStore(conn)
         result.initialize_schema()
         yield result
