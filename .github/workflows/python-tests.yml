@@ -24,6 +24,6 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
       - name: Install RADICH and test dependencies
-        run: python -m pip install -e '.[test]'
+        run: python -m pip install -e '.[test,api,api-test]'
       - name: Run tests
         run: python -m pytest -q
