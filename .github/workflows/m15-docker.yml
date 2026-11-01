@@ -1,0 +1,65 @@
+name: RADICH M15 Docker Compose integration
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  docker-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure test-only secrets
+        run: |
+          echo "RADICH_API_KEY=ci-only-api-key" >> "$GITHUB_ENV"
+          echo "POSTGRES_PASSWORD=ci-only-postgres-password" >> "$GITHUB_ENV"
+      - name: Validate Compose
+        run: docker compose config --quiet
+      - name: Build and start containers
+        run: docker compose up -d --build --wait
+      - name: Validate HTTP DAG and PostgreSQL persistence after restart
+        run: |
+          python - <<'PY'
+          import json
+          import urllib.request
+          import urllib.error
+          url = "http://127.0.0.1:8000"
+          headers = {"X-API-Key": "ci-only-api-key", "Content-Type": "application/json"}
+          payload = json.dumps({"initial_payloads": {"extract": {"text": "RADICH on Hetzner"}}}).encode()
+          request = urllib.request.Request(url + "/v1/runs", data=payload, headers=headers, method="POST")
+          with urllib.request.urlopen(request, timeout=15) as response:
+              result = json.load(response)
+          assert result["state"] == "COMPLETED", result
+          assert result["execution_order"] == ["extract", "validate", "summarize"], result
+          assert result["outputs"]["summarize"]["payload"]["summary"] == "RADICH on Hetzner", result
+          with open("/tmp/radich-ci-run-id", "w") as f:
+              f.write(result["run_id"])
+          try:
+              urllib.request.urlopen(url + "/v1/runs/" + result["run_id"], timeout=5)
+          except urllib.error.HTTPError as e:
+              assert e.code == 401, e.code
+          else:
+              raise AssertionError("Unauthenticated access must fail")
+          PY
+          docker compose restart radich
+          docker compose up -d --wait
+          python - <<'PY'
+          import json
+          import urllib.request
+          run_id = open("/tmp/radich-ci-run-id").read().strip()
+          request = urllib.request.Request(
+              "http://127.0.0.1:8000/v1/runs/" + run_id,
+              headers={"X-API-Key": "ci-only-api-key"})
+          with urllib.request.urlopen(request, timeout=15) as response:
+              result = json.load(response)
+          assert result["state"] == "COMPLETED", result
+          print("RADICH Docker -> API -> DAG -> PostgreSQL -> restart -> GET: OK")
+          PY
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose logs --no-color
+      - name: Stop containers
+        if: always()
+        run: docker compose down --volumes
