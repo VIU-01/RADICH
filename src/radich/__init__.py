@@ -3,9 +3,11 @@
 from .contracts import EdgeSpec, NodeInput, NodeOutput, NodeSpec, RunState
 from .graph import CycleError, DuplicateEdgeError, NodeGraph
 from .registry import DuplicateNodeError, NodeRegistry, UnknownNodeError
+from .scheduler import Scheduler, SchedulerResult
 
 __all__ = [
     "NodeSpec", "EdgeSpec", "NodeInput", "NodeOutput", "RunState",
     "NodeRegistry", "DuplicateNodeError", "UnknownNodeError",
     "NodeGraph", "DuplicateEdgeError", "CycleError",
+    "Scheduler", "SchedulerResult",
 ]
