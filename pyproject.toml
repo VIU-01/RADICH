@@ -14,6 +14,8 @@ where = ["src"]
 [project.optional-dependencies]
 test = ["pytest>=8,<10"]
 postgres = ["psycopg[binary]>=3.2,<4"]
+api = ["fastapi>=0.115,<1", "uvicorn>=0.30,<1"]
+api-test = ["httpx>=0.27,<1"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
