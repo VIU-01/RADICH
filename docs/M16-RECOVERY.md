@@ -40,7 +40,7 @@ import psycopg
 from radich.persistence.checkpoints import PostgresCheckpointStore
 from radich.recovery import RecoverableScheduler
 
-with psycopg.connect(database_url) as connection:
+with psycopg.connect(database_url, autocommit=True) as connection:
     store = PostgresCheckpointStore(connection)
     store.initialize_schema()
     scheduler = RecoverableScheduler(graph, handlers, store)
@@ -65,3 +65,9 @@ with psycopg.connect(database_url) as connection:
 `.github/workflows/m16-recovery.yml` provisions a PostgreSQL 16 service and explicitly runs both M16.2 database tests and M16.3 hard-exit test. The workflow fails on skipped tests, preventing a misleading green check without a database.
 
 **Scope:** process crash with persistent PostgreSQL; it is not yet a live Docker container kill/restart test and does not establish run-level fencing or exactly-once side effects. Production API remains on the M15 runner until a separate integration is implemented.
+
+### Correction after crash-test failure
+
+The initial crash test exposed an actual durability defect: psycopg's default non-autocommit connection could leave the successful `extract` checkpoint inside an outer transaction started by `load()`. The nested `transaction()` in `save()` was then only a savepoint; `os._exit()` rolled the outer transaction back.
+
+`PostgresCheckpointStore` now **requires `autocommit=True`**, and both PostgreSQL integration fixtures and crash-test workers use it. In this mode each `save()` transaction commits independently before the next handler starts. This does not provide exactly-once side effects.
