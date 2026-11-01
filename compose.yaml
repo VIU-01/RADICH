@@ -42,7 +42,9 @@ services:
 
 networks:
   backend:
-    internal: true
+    # Private Docker bridge; no PostgreSQL ports are published.
+    # 'internal: true' prevents host-to-published-port access on Linux.
+    driver: bridge
 
 volumes:
   postgres_data:
