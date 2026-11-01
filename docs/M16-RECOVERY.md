@@ -1,0 +1,73 @@
+# M16 — Recovery and resilience
+
+## M16.1: Checkpoint contract and resumable sequential DAG
+
+- `RunCheckpoint` records successfully completed node outputs and their execution order.
+- `CheckpointStore` defines load/save; `MemoryCheckpointStore` is only for deterministic tests.
+- `RecoverableScheduler` restores completed nodes, skips them, and retries incomplete or failed nodes.
+- The checkpoint is saved after every successful node, not just after the entire graph.
+- Failed nodes are not marked completed. Downstream nodes are cancelled until their predecessors complete.
+
+## Important limitations
+
+This is the **first M16 increment**, not a production crash-recovery solution.
+PostgreSQL-backed checkpoint storage, locking/fencing concurrent workers, durable run inputs, graph-version compatibility, and recovery after abrupt process termination remain to implement.
+External side effects cannot be guaranteed exactly-once merely by saving a checkpoint after a handler; handlers need idempotency keys and/or transactional outbox patterns.
+Do not use this adapter for production crash recovery.
+
+## Acceptance tests
+
+- Failure after extract: resume does not repeat extract, but retries validate and completes summarize.
+- New scheduler instance: all checkpointed nodes are reused.
+- Invalid checkpoint rejected.
+
+Target remains **Hetzner Cloud Linux**, not Windows local.
+
+## M16.2: PostgreSQL checkpoint persistence
+
+`PostgresCheckpointStore` in `src/radich/persistence/checkpoints.py` implements the same `CheckpointStore` protocol with an injected psycopg 3 connection. Call `initialize_schema()` before use.
+
+- Stores completed outputs and execution order in `radich_checkpoints` as JSONB.
+- Each save is atomic; a row-level `SELECT ... FOR UPDATE` serializes updates for the same run.
+- Rejects stale writes, changed completed outputs and divergent checkpoint order.
+- `load(run_id)` reconstructs and validates a `RunCheckpoint`.
+- Can be injected into `RecoverableScheduler`; a new scheduler process can resume using the same database.
+
+### Example
+
+```python
+import psycopg
+from radich.persistence.checkpoints import PostgresCheckpointStore
+from radich.recovery import RecoverableScheduler
+
+with psycopg.connect(database_url, autocommit=True) as connection:
+    store = PostgresCheckpointStore(connection)
+    store.initialize_schema()
+    scheduler = RecoverableScheduler(graph, handlers, store)
+    result = scheduler.run("stable-run-id", initial_payloads)
+```
+
+### Tests
+
+`tests/test_m16_postgres_checkpoints.py` verifies persistence, stale/conflicting checkpoint rejection and recovery after a failed node. It requires `RADICH_TEST_DATABASE_URL` or `TEST_DATABASE_URL`; otherwise PostgreSQL-specific tests skip.
+
+### Remaining M16 work
+
+- Persist immutable initial inputs and graph version to prevent inconsistent resumption.
+- Introduce run-level execution leases/fencing: row locking during `save` alone does **not** prevent two workers executing a handler simultaneously.
+- Add restart/kill integration tests against actual Docker/PostgreSQL and wire the production API runner to the recoverable scheduler.
+- Add idempotency protections for external actions; database checkpointing is not exactly-once execution.
+
+## M16.3: Hard process termination and restart validation
+
+`tests/test_m16_crash_restart.py` starts a Python worker process with a real PostgreSQL connection. The worker commits the `extract` checkpoint, then exits immediately with `os._exit(79)` inside `validate`. A **new** Python process resumes the same run and asserts that `extract` must not execute again. The final checkpoint must contain all three nodes.
+
+`.github/workflows/m16-recovery.yml` provisions a PostgreSQL 16 service and explicitly runs both M16.2 database tests and M16.3 hard-exit test. The workflow fails on skipped tests, preventing a misleading green check without a database.
+
+**Scope:** process crash with persistent PostgreSQL; it is not yet a live Docker container kill/restart test and does not establish run-level fencing or exactly-once side effects. Production API remains on the M15 runner until a separate integration is implemented.
+
+### Correction after crash-test failure
+
+The initial crash test exposed an actual durability defect: psycopg's default non-autocommit connection could leave the successful `extract` checkpoint inside an outer transaction started by `load()`. The nested `transaction()` in `save()` was then only a savepoint; `os._exit()` rolled the outer transaction back.
+
+`PostgresCheckpointStore` now **requires `autocommit=True`**, and both PostgreSQL integration fixtures and crash-test workers use it. In this mode each `save()` transaction commits independently before the next handler starts. This does not provide exactly-once side effects.
