@@ -57,3 +57,11 @@ with psycopg.connect(database_url) as connection:
 - Introduce run-level execution leases/fencing: row locking during `save` alone does **not** prevent two workers executing a handler simultaneously.
 - Add restart/kill integration tests against actual Docker/PostgreSQL and wire the production API runner to the recoverable scheduler.
 - Add idempotency protections for external actions; database checkpointing is not exactly-once execution.
+
+## M16.3: Hard process termination and restart validation
+
+`tests/test_m16_crash_restart.py` starts a Python worker process with a real PostgreSQL connection. The worker commits the `extract` checkpoint, then exits immediately with `os._exit(79)` inside `validate`. A **new** Python process resumes the same run and asserts that `extract` must not execute again. The final checkpoint must contain all three nodes.
+
+`.github/workflows/m16-recovery.yml` provisions a PostgreSQL 16 service and explicitly runs both M16.2 database tests and M16.3 hard-exit test. The workflow fails on skipped tests, preventing a misleading green check without a database.
+
+**Scope:** process crash with persistent PostgreSQL; it is not yet a live Docker container kill/restart test and does not establish run-level fencing or exactly-once side effects. Production API remains on the M15 runner until a separate integration is implemented.
