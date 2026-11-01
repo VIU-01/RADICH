@@ -36,3 +36,7 @@ El adaptador HTTP con PostgreSQL y configuración de despliegue queda pendiente.
 Incluye DAG, políticas, rechazo por falta de aprobación y reintentos configurables.
 No implementa pausa/reanudación, cola de trabajos, autenticación de actores
 externos, persistencia automática ni ejecución de agentes de IA.
+
+## CI
+
+Las pruebas de la demostración se ejecutan en la PR contra main, tras M12.
