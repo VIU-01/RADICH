@@ -63,6 +63,6 @@ def test_repository_requires_connection():
 
 def test_duplicate_execution_order_rejected():
     r = sample()
-    r.execution_order = ("a", "a")
+    object.__setattr__(r, "execution_order", ("a", "a"))
     with pytest.raises(ValueError):
         _validate(r)
