@@ -1,6 +1,6 @@
 """M16.2 PostgreSQL checkpoint store.
 
-Uses an injected psycopg 3 connection. Each checkpoint is committed atomically.
+Requires a psycopg 3 autocommit connection so each checkpoint commits durably.
 Only monotonic successful-node progress is accepted.
 """
 from __future__ import annotations
@@ -51,6 +51,8 @@ class PostgresCheckpointStore:
     def __init__(self, connection: Any):
         if connection is None or not hasattr(connection, "execute") or not hasattr(connection, "transaction"):
             raise TypeError("connection must support execute() and transaction()")
+        if getattr(connection, "autocommit", None) is not True:
+            raise ValueError("checkpoint connection must use autocommit=True for crash durability")
         self._connection = connection
 
     def initialize_schema(self) -> None:
