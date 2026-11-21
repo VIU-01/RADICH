@@ -54,7 +54,8 @@ def _serialize(result: SchedulerResult) -> RunResponse:
     )
 
 
-def create_app(*, runner: Any, repository: Any, api_key: str) -> FastAPI:
+def create_app(*, runner: Any, repository: Any, api_key: str,
+               resume_runner: Any | None = None) -> FastAPI:
     """Create an API with injected synchronous runner and persistent repository.
 
     Pass RecordingScheduler for durable POST results. Never expose without HTTPS.
@@ -65,6 +66,9 @@ def create_app(*, runner: Any, repository: Any, api_key: str) -> FastAPI:
         raise TypeError("runner must expose run(run_id, initial_payloads)")
     if repository is None or not callable(getattr(repository, "get_run", None)):
         raise TypeError("repository must expose get_run(run_id)")
+
+    if resume_runner is not None and not callable(getattr(resume_runner, "resume", None)):
+        raise TypeError("resume_runner must expose resume(run_id)")
 
     app = FastAPI(title="RADICH Core API", version="0.1.0")
 
@@ -103,5 +107,21 @@ def create_app(*, runner: Any, repository: Any, api_key: str) -> FastAPI:
             raise
         except Exception as exc:
             raise HTTPException(status_code=500, detail="Unable to read run") from exc
+
+    if resume_runner is not None:
+        @app.post("/v1/runs/{run_id}/resume", response_model=RunResponse,
+                  dependencies=[Depends(authorize)])
+        def resume_run(run_id: str) -> RunResponse:
+            """Explicitly resume an interrupted, pre-registered execution."""
+            try:
+                return _serialize(resume_runner.resume(run_id))
+            except KeyError:
+                raise HTTPException(status_code=404, detail="Run not found") from None
+            except DuplicateRunError:
+                raise HTTPException(status_code=409, detail="Run is busy or already exists") from None
+            except (ValueError, TypeError) as exc:
+                raise HTTPException(status_code=422, detail="Invalid execution request") from exc
+            except Exception as exc:
+                raise HTTPException(status_code=500, detail="Execution failed") from exc
 
     return app
