@@ -17,8 +17,10 @@ AGENT_NODE = "agent_a01"
 SKILL_PERMISSION = "skills.text.normalize"
 
 
-def build_m17_runner(run_id: str, *, grant_skill: bool = True) -> Scheduler:
-    """Bind the policy context to one run and return a guarded offline runner."""
+def build_m17_components(
+    run_id: str, *, grant_skill: bool = True
+) -> tuple[NodeGraph, dict]:
+    """Provide graph and permission-guarded handlers for a single run."""
     if type(grant_skill) is not bool:
         raise TypeError("grant_skill must be bool")
 
@@ -45,6 +47,10 @@ def build_m17_runner(run_id: str, *, grant_skill: bool = True) -> Scheduler:
         SimulatedTextAgent(agent, skill, node_id=AGENT_NODE),
         PolicyEngine(), context, NodePolicy(required_permission=skill.required_permission),
     )
-    return Scheduler(
-        graph, {"extract": demo_handlers()["extract"], AGENT_NODE: agent_handler}
-    )
+    return graph, {"extract": demo_handlers()["extract"], AGENT_NODE: agent_handler}
+
+
+def build_m17_runner(run_id: str, *, grant_skill: bool = True) -> Scheduler:
+    """Backward-compatible M17 runner; M17.5 uses the same guarded components."""
+    graph, handlers = build_m17_components(run_id, grant_skill=grant_skill)
+    return Scheduler(graph, handlers)
