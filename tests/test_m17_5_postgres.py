@@ -1,5 +1,6 @@
 """M17.5: real PostgreSQL and HTTP end-to-end tests, including process crash."""
 
+import json
 import os
 import subprocess
 import sys
@@ -63,6 +64,50 @@ def test_api_agent_persists_result_and_get_after_new_app_instance():
     assert restarted.post(
         f"/v1/runs/{body['run_id']}/resume", headers=headers()
     ).json() == body
+    progress = restarted.get(
+        f"/v1/runs/{body['run_id']}/progress", headers=headers()
+    )
+    assert progress.status_code == 200
+    assert progress.json() == {
+        "run_id": body["run_id"], "phase": "FINALIZED",
+        "terminal_state": "COMPLETED",
+        "completed_nodes": ["extract", AGENT_NODE],
+        "execution_order": ["extract", AGENT_NODE],
+    }
+    assert "saludo" not in progress.text
+    assert "normalized_text" not in progress.text
+
+
+def test_registered_progress_has_no_input_or_checkpoint_and_is_read_only():
+    client = new_client()
+    run_id = str(uuid4())
+    secret_text = "private-test-payload-no-progress-leak"
+    with psycopg.connect(DSN, autocommit=True) as conn:
+        conn.execute(
+            "INSERT INTO radich_m17_requests (run_id, initial_payloads) "
+            "VALUES (%s, %s::jsonb)",
+            (run_id, json.dumps({"extract": {"text": secret_text}})),
+        )
+    url = f"/v1/runs/{run_id}/progress"
+    assert client.get(url).status_code == 401
+    assert client.get(url, headers={"X-API-Key": "wrong"}).status_code == 401
+    response = client.get(url, headers=headers())
+    assert response.status_code == 200
+    assert response.json() == {
+        "run_id": run_id, "phase": "REGISTERED", "terminal_state": None,
+        "completed_nodes": [], "execution_order": [],
+    }
+    assert secret_text not in response.text
+    assert client.get(f"/v1/runs/{run_id}", headers=headers()).status_code == 404
+    assert client.get("/v1/runs/unknown-m19-progress/progress", headers=headers()).status_code == 404
+    # A read must not create a checkpoint or terminal snapshot.
+    with psycopg.connect(DSN, autocommit=True) as conn:
+        assert conn.execute(
+            "SELECT 1 FROM radich_checkpoints WHERE run_id = %s", (run_id,)
+        ).fetchone() is None
+        assert conn.execute(
+            "SELECT 1 FROM radich_runs WHERE run_id = %s", (run_id,)
+        ).fetchone() is None
 
 
 def test_unauthorized_and_invalid_requests_fail_closed():
@@ -105,6 +150,17 @@ def test_missing_skill_permission_is_recorded_as_failure():
     assert new_client(grant=True).post(
         f"/v1/runs/{body['run_id']}/resume", headers=headers()
     ).json() == body
+    progress = client.get(
+        f"/v1/runs/{body['run_id']}/progress", headers=headers()
+    )
+    assert progress.status_code == 200
+    assert progress.json() == {
+        "run_id": body["run_id"], "phase": "FINALIZED",
+        "terminal_state": "FAILED",
+        "completed_nodes": ["extract"],
+        "execution_order": ["extract", AGENT_NODE],
+    }
+    assert "allowed text" not in progress.text
 
 
 def test_two_workers_cannot_resume_same_run_concurrently():
@@ -164,6 +220,15 @@ service.M17AgentRunner(repo, grant_skill=True).run(
     client = new_client()
     # Interrupted requests do not yet have the immutable final snapshot.
     assert client.get(f"/v1/runs/{run_id}", headers=headers()).status_code == 404
+    incomplete = client.get(f"/v1/runs/{run_id}/progress", headers=headers())
+    assert incomplete.status_code == 200
+    assert incomplete.json() == {
+        "run_id": run_id, "phase": "CHECKPOINTED",
+        "terminal_state": None,
+        "completed_nodes": ["extract"], "execution_order": ["extract"],
+    }
+    assert "radich   survives" not in incomplete.text
+    assert "payload" not in incomplete.text
     assert client.post(f"/v1/runs/{run_id}/resume").status_code == 401
     resumed = client.post(f"/v1/runs/{run_id}/resume", headers=headers())
     assert resumed.status_code == 200, resumed.text
@@ -174,3 +239,11 @@ service.M17AgentRunner(repo, grant_skill=True).run(
     assert new_client().get(
         f"/v1/runs/{run_id}", headers=headers()
     ).json() == body
+    completed = client.get(f"/v1/runs/{run_id}/progress", headers=headers())
+    assert completed.status_code == 200
+    assert completed.json() == {
+        "run_id": run_id, "phase": "FINALIZED",
+        "terminal_state": "COMPLETED",
+        "completed_nodes": ["extract", AGENT_NODE],
+        "execution_order": ["extract", AGENT_NODE],
+    }
