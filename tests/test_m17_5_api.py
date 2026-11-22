@@ -83,3 +83,74 @@ def test_bad_resume_runner_rejected():
             runner=FakeRunner(), repository=FakeRepository(), api_key="key",
             resume_runner=object(),
         )
+
+
+class FakeProgressReader:
+    def __init__(self):
+        self.reads = []
+
+    def get_progress(self, run_id):
+        self.reads.append(run_id)
+        if run_id == "unknown":
+            return None
+        if run_id == "error":
+            raise RuntimeError("secret-postgres-connection")
+        return {
+            "run_id": run_id,
+            "phase": "CHECKPOINTED",
+            "terminal_state": None,
+            "completed_nodes": ["extract"],
+            "execution_order": ["extract"],
+        }
+
+
+def test_progress_is_opt_in_and_m15_routes_unchanged():
+    runner = FakeRunner()
+    client = TestClient(create_app(runner=runner, repository=FakeRepository(), api_key="key"))
+    assert client.get("/v1/runs/known/progress", headers={"X-API-Key": "key"}).status_code == 404
+    assert client.get("/v1/runs/known", headers={"X-API-Key": "key"}).status_code == 404
+    assert runner.resumes == []
+
+
+def test_progress_is_authenticated_read_only_and_has_no_payloads():
+    runner = FakeRunner()
+    progress = FakeProgressReader()
+    client = TestClient(create_app(
+        runner=runner, repository=FakeRepository(), api_key="key",
+        progress_reader=progress,
+    ))
+    endpoint = "/v1/runs/known/progress"
+    assert client.get(endpoint).status_code == 401
+    assert client.get(endpoint, headers={"X-API-Key": "wrong"}).status_code == 401
+    assert progress.reads == []
+
+    result = client.get(endpoint, headers={"X-API-Key": "key"})
+    assert result.status_code == 200
+    assert result.json() == {
+        "run_id": "known", "phase": "CHECKPOINTED",
+        "terminal_state": None,
+        "completed_nodes": ["extract"], "execution_order": ["extract"],
+    }
+    assert "payload" not in result.text
+    assert progress.reads == ["known"]
+    assert runner.resumes == []
+    assert client.get("/v1/runs/unknown/progress", headers={"X-API-Key": "key"}).status_code == 404
+
+
+def test_progress_database_error_does_not_leak_details():
+    client = TestClient(create_app(
+        runner=FakeRunner(), repository=FakeRepository(), api_key="key",
+        progress_reader=FakeProgressReader(),
+    ))
+    response = client.get("/v1/runs/error/progress", headers={"X-API-Key": "key"})
+    assert response.status_code == 500
+    assert "secret" not in response.text
+    assert "postgres" not in response.text
+
+
+def test_invalid_progress_reader_rejected():
+    with pytest.raises(TypeError):
+        create_app(
+            runner=FakeRunner(), repository=FakeRepository(), api_key="key",
+            progress_reader=object(),
+        )
