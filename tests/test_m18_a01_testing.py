@@ -40,7 +40,7 @@ def test_explicit_testing_flag_grants_only_existing_server_side_skill(monkeypatc
         received.update(kwargs)
         return sentinel
 
-    monkeypatch.setattr(testing_deployment, "build_m17_app", fake_m17_factory)
+    monkeypatch.setattr(testing_deployment, "_build_m17_app", fake_m17_factory)
     assert testing_deployment.build_app() is sentinel
     assert received == {
         "dsn": "postgresql://host:5432/radich_a01",
