@@ -58,6 +58,48 @@ class M17AgentRepository:
         with psycopg.connect(self.dsn, autocommit=True) as conn:
             return PostgresRunRepository(conn).get_run(run_id)
 
+    def get_progress(self, run_id: str) -> dict[str, Any] | None:
+        """Single-snapshot metadata read; never return inputs or output payloads.
+
+        Phase is an observation, not proof that a worker has stopped.
+        """
+        if not isinstance(run_id, str) or not run_id.strip():
+            raise ValueError("run_id must be nonempty")
+        with psycopg.connect(self.dsn, autocommit=True) as conn:
+            # One SELECT gives the request, checkpoint and terminal snapshot
+            # a consistent database view even during a concurrent resume.
+            row = conn.execute(
+                "SELECT r.run_id, c.execution_order, f.state, f.execution_order "
+                "FROM radich_m17_requests AS r "
+                "LEFT JOIN radich_checkpoints AS c ON c.run_id = r.run_id "
+                "LEFT JOIN radich_runs AS f ON f.run_id = r.run_id "
+                "WHERE r.run_id = %s",
+                (run_id,),
+            ).fetchone()
+        if row is None:
+            return None
+
+        checkpoint_order = (
+            json.loads(row[1]) if isinstance(row[1], str) else (row[1] or [])
+        )
+        final_order = (
+            json.loads(row[3]) if isinstance(row[3], str) else (row[3] or [])
+        )
+        terminal_state = row[2]
+        if terminal_state is not None:
+            phase = "FINALIZED"
+            order = final_order
+        else:
+            phase = "CHECKPOINTED" if checkpoint_order else "REGISTERED"
+            order = checkpoint_order
+        return {
+            "run_id": row[0],
+            "phase": phase,
+            "terminal_state": terminal_state,
+            "completed_nodes": list(checkpoint_order),
+            "execution_order": list(order),
+        }
+
 
 class M17AgentRunner:
     """Recoverable opt-in executor; authorization never comes from HTTP payloads."""
@@ -139,4 +181,5 @@ def build_m17_app(*, dsn: str, api_key: str, grant_skill: bool = False):
     return create_app(
         runner=runner, repository=repository, api_key=api_key,
         resume_runner=runner,
+        progress_reader=repository,
     )
