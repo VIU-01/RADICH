@@ -37,9 +37,11 @@ jobs:
           test -z "$(docker compose -f compose.yaml -f compose.a01-testing.yaml --profile a01-test ps -q radich)"
           test -z "$(docker compose -f compose.yaml -f compose.a01-testing.yaml --profile a01-test ps -q postgres)"
           docker compose -f compose.yaml -f compose.a01-testing.yaml --profile a01-test port radich-a01 8000 | grep -Fx "127.0.0.1:8001"
-          if docker compose -f compose.yaml -f compose.a01-testing.yaml --profile a01-test port postgres-a01 5432 > /tmp/a01-db-port 2>/dev/null; then
-            test ! -s /tmp/a01-db-port
-          fi
+          db_container="$(docker compose -f compose.yaml -f compose.a01-testing.yaml --profile a01-test ps -q postgres-a01)"
+          test -n "$db_container"
+          # Compose 'port' may report internal ports. Docker inspect checks actual published host bindings.
+          published="$(docker inspect --format '{{range $p, $bindings := .NetworkSettings.Ports}}{{if $bindings}}{{println $p}}{{end}}{{end}}' "$db_container")"
+          test -z "$published" || { echo "FAIL: A01 PostgreSQL publishes a host port: $published"; exit 1; }
       - name: A01 HTTP authorization and normalization smoke
         run: python scripts/m18_a01_smoke.py create /tmp/a01-run-id
       - name: Restart isolated A01 and PostgreSQL only
