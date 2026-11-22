@@ -1,0 +1,61 @@
+# M18: optional A01/M17.5 TESTING ONLY. Do not run this as a public deployment.
+# Uses separate database and volume; the default M15 services stay untouched.
+# Run: docker compose -f compose.yaml -f compose.a01-testing.yaml --profile a01-test up -d --build radich-a01
+services:
+  radich-a01:
+    profiles: ["a01-test"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command:
+      - uvicorn
+      - radich.agents.testing_deployment:build_app
+      - --factory
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8000"
+    environment:
+      RADICH_A01_TESTING_ENABLED: "yes"
+      RADICH_API_KEY: ${RADICH_API_KEY:?Set RADICH_API_KEY in the private .env}
+      DATABASE_URL: postgresql://radich:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the private .env}@postgres-a01:5432/radich_a01
+    depends_on:
+      postgres-a01:
+        condition: service_healthy
+    ports:
+      # No public binding: only local VPS or an explicitly configured SSH tunnel.
+      - "127.0.0.1:8001:8000"
+    networks:
+      - a01_backend
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  postgres-a01:
+    profiles: ["a01-test"]
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: radich
+      POSTGRES_DB: radich_a01
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the private .env}
+    volumes:
+      - postgres_a01_data:/var/lib/postgresql/data
+    networks:
+      - a01_backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U radich -d radich_a01"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+networks:
+  a01_backend:
+    driver: bridge
+
+volumes:
+  postgres_a01_data:
