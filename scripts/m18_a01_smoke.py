@@ -22,17 +22,18 @@ EXAMPLE = "  prueba    A01   RADICH   "
 EXPECTED = "prueba A01 RADICH"
 
 
-def read_key() -> str:
-    key = os.environ.get("RADICH_API_KEY")
+def read_key(name: str) -> str:
+    """Read only a specifically named secret; never fall back from A01 to M15."""
+    key = os.environ.get(name)
     if key:
         return key
     env = Path(__file__).resolve().parents[1] / ".env"
     for line in env.read_text(encoding="utf-8").splitlines():
-        if line.startswith("RADICH_API_KEY="):
-            key = line.split("=", 1)[1]
+        if line.startswith(name + "="):
+            key = line.split("=", 1)[1].strip().strip('"').strip("'")
             if key:
                 return key
-    raise RuntimeError("RADICH_API_KEY not configured")
+    raise RuntimeError(f"{name} not configured")
 
 
 def call(path: str, *, key: str | None = None, payload: dict | None = None):
@@ -83,6 +84,7 @@ def create(state_file: Path, key: str) -> None:
     payload = {"initial_payloads": {"extract": {"text": EXAMPLE}}}
     assert call("/v1/runs", payload=payload)[0] == 401
     assert call("/v1/runs", key="wrong-key", payload=payload)[0] == 401
+    assert call("/v1/runs", key=read_key("RADICH_API_KEY"), payload=payload)[0] == 401
     invalid = {"initial_payloads": {"extract": {"text": "x", "tool": "write"}}}
     assert call("/v1/runs", key=key, payload=invalid)[0] == 422
     status, run = call("/v1/runs", key=key, payload=payload)
@@ -111,4 +113,7 @@ if __name__ == "__main__":
     if len(sys.argv) != 3 or sys.argv[1] not in ("create", "verify"):
         sys.exit("usage: m18_a01_smoke.py create|verify /path/to/state-file")
     wait_healthy()
-    (create if sys.argv[1] == "create" else verify)(Path(sys.argv[2]), read_key())
+    a01_key = read_key("RADICH_A01_API_KEY")
+    if a01_key == read_key("RADICH_API_KEY"):
+        raise RuntimeError("A01 API key must differ from the M15 API key")
+    (create if sys.argv[1] == "create" else verify)(Path(sys.argv[2]), a01_key)

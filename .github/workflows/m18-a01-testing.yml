@@ -16,7 +16,9 @@ jobs:
     env:
       # Synthetic ephemeral CI credentials, never production keys.
       POSTGRES_PASSWORD: ci-m18-a01-only
-      RADICH_API_KEY: ci-m18-a01-key-only
+      RADICH_API_KEY: ci-m18-m15-key-only
+      RADICH_A01_POSTGRES_PASSWORD: ci-m18-a01-db-only
+      RADICH_A01_API_KEY: ci-m18-a01-key-only
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -29,6 +31,15 @@ jobs:
       - name: Validate isolated Compose profile
         run: |
           set -euo pipefail
+          # Fail closed when either A01 secret is missing; M15 credentials must not be reused.
+          test "$RADICH_A01_API_KEY" != "$RADICH_API_KEY"
+          test "$RADICH_A01_POSTGRES_PASSWORD" != "$POSTGRES_PASSWORD"
+          if env -u RADICH_A01_API_KEY docker compose -f compose.yaml -f compose.a01-testing.yaml --profile a01-test config -q >/dev/null 2>&1; then
+            echo "FAIL: isolated A01 API key is not mandatory"; exit 1
+          fi
+          if env -u RADICH_A01_POSTGRES_PASSWORD docker compose -f compose.yaml -f compose.a01-testing.yaml --profile a01-test config -q >/dev/null 2>&1; then
+            echo "FAIL: isolated A01 DB password is not mandatory"; exit 1
+          fi
           docker compose -f compose.yaml -f compose.a01-testing.yaml --profile a01-test config -q
       - name: Start only A01 and its private database
         run: |

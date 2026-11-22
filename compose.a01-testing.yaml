@@ -18,8 +18,8 @@ services:
       - "8000"
     environment:
       RADICH_A01_TESTING_ENABLED: "yes"
-      RADICH_API_KEY: ${RADICH_API_KEY:?Set RADICH_API_KEY in the private .env}
-      DATABASE_URL: postgresql://radich:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the private .env}@postgres-a01:5432/radich_a01
+      RADICH_API_KEY: ${RADICH_A01_API_KEY:?Set a distinct RADICH_A01_API_KEY in the private .env}
+      DATABASE_URL: postgresql://radich:${RADICH_A01_POSTGRES_PASSWORD:?Set a distinct RADICH_A01_POSTGRES_PASSWORD in the private .env}@postgres-a01:5432/radich_a01
     depends_on:
       postgres-a01:
         condition: service_healthy
@@ -42,7 +42,7 @@ services:
     environment:
       POSTGRES_USER: radich
       POSTGRES_DB: radich_a01
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the private .env}
+      POSTGRES_PASSWORD: ${RADICH_A01_POSTGRES_PASSWORD:?Set a distinct RADICH_A01_POSTGRES_PASSWORD in the private .env}
     volumes:
       - postgres_a01_data:/var/lib/postgresql/data
     networks:
