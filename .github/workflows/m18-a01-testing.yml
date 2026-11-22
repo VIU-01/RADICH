@@ -1,0 +1,54 @@
+name: RADICH M18 isolated A01 testing deployment
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  a01-testing-compose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    env:
+      # Synthetic ephemeral CI credentials, never production keys.
+      POSTGRES_PASSWORD: ci-m18-a01-only
+      RADICH_API_KEY: ci-m18-a01-key-only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test requirements
+        run: python -m pip install -e ".[test,api,api-test,postgres]"
+      - name: Fail-closed factory tests
+        run: python -m pytest -q tests/test_m18_a01_testing.py
+      - name: Validate isolated Compose profile
+        run: |
+          set -euo pipefail
+          docker compose -f compose.yaml -f compose.a01-testing.yaml --profile a01-test config -q
+      - name: Start only A01 and its private database
+        run: |
+          set -euo pipefail
+          docker compose -f compose.yaml -f compose.a01-testing.yaml --profile a01-test up -d --build radich-a01
+          test -z "$(docker compose -f compose.yaml -f compose.a01-testing.yaml --profile a01-test ps -q radich)"
+          test -z "$(docker compose -f compose.yaml -f compose.a01-testing.yaml --profile a01-test ps -q postgres)"
+          docker compose -f compose.yaml -f compose.a01-testing.yaml --profile a01-test port radich-a01 8000 | grep -Fx "127.0.0.1:8001"
+          if docker compose -f compose.yaml -f compose.a01-testing.yaml --profile a01-test port postgres-a01 5432 > /tmp/a01-db-port 2>/dev/null; then
+            test ! -s /tmp/a01-db-port
+          fi
+      - name: A01 HTTP authorization and normalization smoke
+        run: python scripts/m18_a01_smoke.py create /tmp/a01-run-id
+      - name: Restart isolated A01 and PostgreSQL only
+        run: |
+          docker compose -f compose.yaml -f compose.a01-testing.yaml --profile a01-test restart radich-a01 postgres-a01
+      - name: Verify persisted A01 execution and immutable resume
+        run: python scripts/m18_a01_smoke.py verify /tmp/a01-run-id
+      - name: Diagnostics if failed
+        if: failure()
+        run: |
+          docker compose -f compose.yaml -f compose.a01-testing.yaml --profile a01-test ps || true
+          docker compose -f compose.yaml -f compose.a01-testing.yaml --profile a01-test logs --tail=60 radich-a01 postgres-a01 || true
