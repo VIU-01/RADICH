@@ -1,6 +1,6 @@
 # M18 — A01/M17.5: despliegue opcional para TESTING (Hosting.com / Linux)
 
-**Estado:** PROPUESTA en PR. **NO desplegar ni fusionar sin aprobación del usuario.**
+**Estado actualizado (22/11/2026): M18 A01 TEST instalada y validada en sandbox.** PR #16 fusionada (commit `e566d59`), y actualización posterior M19.1 PR #18 fusionada (commit `4f504da`) **desplegada manualmente solo en A01**. CI de `main` 6/6 correctos; en el VPS M15/A01 `/health` OK y `/progress` A01 pasó 401/200/404. El texto siguiente conserva el procedimiento de **primera instalación** para trazabilidad; no volver a ejecutarlo como si el servicio aún no existiera.
 
 Esta microtarea activa de forma controlada el **agente simulado A01** (skill local `text.normalize`) y la persistencia/checkpoints M17.5 en un **segundo servicio independiente**. No hay LLM, acceso a herramientas externas, ni razonamiento autónomo.
 
@@ -24,11 +24,11 @@ Ninguna base publica el puerto 5432. No hay HTTPS público ni interfaz web. **No
 3. `/opt/radich/.env` contiene `POSTGRES_PASSWORD` y `RADICH_API_KEY` de M15, **además de** `RADICH_A01_POSTGRES_PASSWORD` y `RADICH_A01_API_KEY`, cada una con valor nuevo y distinto del de M15. Permisos `0600`. Nunca mostrar ni copiar secretos.
 4. `sudo docker compose ps` muestra demo M15 y PostgreSQL saludables; `/health` en `127.0.0.1:8000` OK.
 
-## Preparación de credenciales A01 en el VPS — SOLO TRAS AUTORIZAR EL DESPLIEGUE
+## Preparación inicial de credenciales A01 (histórica; NO regenerar en el VPS existente)
 
 `compose.a01-testing.yaml` toma los secretos **exclusivamente** de `RADICH_A01_API_KEY` y `RADICH_A01_POSTGRES_PASSWORD`; dentro del contenedor se inyectan como `RADICH_API_KEY` y `POSTGRES_PASSWORD` de A01 para mantener compatibilidad con la aplicación. El `compose.yaml` de M15 sigue utilizando sus valores originales. La falta de cualquiera de las variables A01 debe detener el arranque, nunca reutilizar las de M15.
 
-No crear ni guardar credenciales reales en GitHub, Drive o el chat. Cuando se autorice el despliegue, en PuTTY como usuario `radich` se puede ejecutar **una sola vez** el siguiente procedimiento, que genera y guarda dos claves aleatorias independientes directamente en el `.env` privado sin mostrarlas:
+No crear ni guardar credenciales reales en GitHub, Drive o el chat. El siguiente bloque fue diseñado **solo para el primer alta**; las credenciales A01 ya existen en el VPS sandbox y **no se deben regenerar ni reemplazar**. Para un VPS nuevo, únicamente tras autorización explícita se podrían crear una vez: 
 
 ```bash
 cd /opt/radich
@@ -57,7 +57,7 @@ PY
 
 Para claves ya existentes, comprobar manualmente que son diferentes de las de M15 antes de arrancar. `docker compose ... config -q` valida las variables obligatorias sin imprimir sus valores. No regenerar contraseñas después de inicializar `postgres-a01` sin una rotación coordinada: PostgreSQL conserva la contraseña anterior en su volumen.
 
-## Instalación futura en el VPS — NO EJECUTAR HASTA APROBAR
+## Instalación inicial en el VPS (procedimiento histórico; no repetir ciegamente)
 
 Todos los comandos son Linux, mediante PuTTY y el usuario `radich`.
 
@@ -113,13 +113,13 @@ El volumen A01 permanece para diagnóstico o copia. **NUNCA** ejecutar `docker c
 
 ## Límites y aceptación
 
-- Sin despliegue automático desde GitHub; esta PR no cambia el VPS.
+- Sin despliegue automático desde GitHub: la PR #16 no cambió el VPS por sí sola, pero el usuario instaló A01 posteriormente por PuTTY y desplegó M19.1 tras la PR #18. La CI de pruebas sí continúa automática.
 - A01 usa credenciales API y PostgreSQL **distintas** de M15; la comprobación HTTP rechaza la clave de M15. La ausencia de secretos A01 provoca fallo de configuración, sin fallback.
 - A01 usa autorización de skill en el **servidor**, no elegida por el usuario HTTP.
 - La llamada `resume` de un resultado terminal devuelve el resultado existente, no reejecuta efectos.
 - La base A01 es **otra instancia de PostgreSQL con su propio volumen**. El `radich_test.dump` anterior solo respalda la demo M15, no este servicio nuevo.
 - No se garantizan efectos externos exactly-once, ni recuperación ante pérdida del VPS sin backup externo.
-- CI debe validar la fábrica de habilitación, aislamiento de red, creación de A01, rechazo de solicitudes indebidas, persistencia tras reinicios y compatibilidad con los cinco workflows existentes.
+- La CI de la PR #18 y la CI posterior de `main` verificaron seis jobs correctamente, incluidos A01 Compose, M17 integración y recuperación. La comprobación de salud y la API de `/progress` se verificaron además en el VPS mediante PuTTY.
 - **Producción:** HTTPS, SSH endurecido, UFW y autenticación web requeridos antes de exponer ninguna API.
 
-**Referencia:** `src/radich/agents/service.py`, `tests/test_m17_5_postgres.py`, commit de main `fafea18581d640ee41ba1a6e80d70d2a4b9eebed`.
+**Referencia histórica de M17.5:** `src/radich/agents/service.py`, `tests/test_m17_5_postgres.py`, commit `fafea18581d640ee41ba1a6e80d70d2a4b9eebed`. **Estado instalado después:** `4f504da158e71a078bc86b141a769667461b8507`. Para una actualización exclusiva de A01, usar `docker compose -f compose.yaml -f compose.a01-testing.yaml --profile a01-test up -d --build --no-deps radich-a01` tras `git merge --ff-only origin/main`, esperando a `healthy`. No usar `down -v` ni cambiar claves de las bases. Bitácora: https://docs.google.com/document/d/1J0LXl1hyOz9wrcpsddibKhKQYsA-DeyQCVpRxlvvIUQ/edit
