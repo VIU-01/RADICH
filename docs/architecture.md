@@ -1,3 +1,3 @@
-# Arquitectura inicial
+# Arquitectura inicial (referencia histórica)
 
-Grafo nativo de Python, sin LangGraph como dependencia de orquestación. Separar nodos, relaciones, agentes, memoria, API e integraciones. PostgreSQL será la persistencia prevista; Docker permitirá reproducir el entorno en Windows y Hetzner. Esta estructura es un esqueleto, no una implementación funcional.
+Este texto nació como esqueleto del 01/11/2026 y se conserva como referencia histórica. El estado real de RADICH a 22/11/2026 es un Core Python/FastAPI con DAG nativo, PostgreSQL, checkpoints y agente A01 simulado desplegado en VPS Linux sandbox identificado como Hosting.com en la guía M18.3. **Windows/WSL2 y Hetzner no son el entorno de ejecución vigente.** M19.1, PR #18 (commit `4f504da`), añadió consulta autenticada y de solo lectura `/v1/runs/{run_id}/progress` a A01, sin modificar M15. El modelo conceptual N01–N28/A01–A13 no está implementado íntegramente. Fuente de verdad operativa: https://docs.google.com/document/d/1SejPnXFqvZTsHnsYhyjYERfMsQrZ2g2OETYd7hv___A/edit
