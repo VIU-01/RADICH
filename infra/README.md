@@ -1,3 +1,3 @@
 # Infraestructura
 
-Objetivo: desarrollo local con Docker en Windows y despliegue futuro en Hetzner. PostgreSQL y copias de seguridad se configurarán antes de producción. No se ha contratado ni desplegado infraestructura.
+Aviso histórico: este README original describía un futuro despliegue local Windows/Hetzner que dejó de ser el estado vigente. **Estado probado 22/11/2026:** VPS Linux sandbox documentado como Hosting.com, Docker Compose M15 y A01 simulada con PostgreSQL en contenedores separados, ambos `/health` correctos; M19.1 PR #18 instalada en A01. No es producción. Se verificó un backup local A01 y su restauración aislada, **no** un backup externo ante desastre. Despliegues **manuales por PuTTY** tras PR/CI y aprobación; no configurar CD GitHub Actions→VPS sin nueva instrucción del usuario. Ver control maestro vigente: https://docs.google.com/document/d/18URU5hm6g8HwpNiLTEVP46sU2qNCB5b1IisjBYUkEys/edit
