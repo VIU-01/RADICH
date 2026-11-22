@@ -5,7 +5,7 @@ No global database connection, no built-in workflows, no public execution endpoi
 from __future__ import annotations
 
 import hmac
-from typing import Any
+from typing import Any, Literal
 from uuid import uuid4
 
 from fastapi import Depends, FastAPI, Header, HTTPException
@@ -36,6 +36,16 @@ class RunResponse(BaseModel):
     execution_order: list[str]
 
 
+class RunProgressResponse(BaseModel):
+    """Metadata-only progress; never expose request or checkpoint payloads."""
+
+    run_id: str
+    phase: Literal["REGISTERED", "CHECKPOINTED", "FINALIZED"]
+    terminal_state: str | None
+    completed_nodes: list[str]
+    execution_order: list[str]
+
+
 def _serialize(result: SchedulerResult) -> RunResponse:
     if not isinstance(result, SchedulerResult):
         raise TypeError("runner/repository must return SchedulerResult")
@@ -55,7 +65,8 @@ def _serialize(result: SchedulerResult) -> RunResponse:
 
 
 def create_app(*, runner: Any, repository: Any, api_key: str,
-               resume_runner: Any | None = None) -> FastAPI:
+               resume_runner: Any | None = None,
+               progress_reader: Any | None = None) -> FastAPI:
     """Create an API with injected synchronous runner and persistent repository.
 
     Pass RecordingScheduler for durable POST results. Never expose without HTTPS.
@@ -69,6 +80,8 @@ def create_app(*, runner: Any, repository: Any, api_key: str,
 
     if resume_runner is not None and not callable(getattr(resume_runner, "resume", None)):
         raise TypeError("resume_runner must expose resume(run_id)")
+    if progress_reader is not None and not callable(getattr(progress_reader, "get_progress", None)):
+        raise TypeError("progress_reader must expose get_progress(run_id)")
 
     app = FastAPI(title="RADICH Core API", version="0.1.0")
 
@@ -107,6 +120,21 @@ def create_app(*, runner: Any, repository: Any, api_key: str,
             raise
         except Exception as exc:
             raise HTTPException(status_code=500, detail="Unable to read run") from exc
+
+    if progress_reader is not None:
+        @app.get("/v1/runs/{run_id}/progress", response_model=RunProgressResponse,
+                 dependencies=[Depends(authorize)])
+        def get_run_progress(run_id: str) -> RunProgressResponse:
+            """Read a consistent metadata-only view without starting any handler."""
+            try:
+                progress = progress_reader.get_progress(run_id)
+                if progress is None:
+                    raise HTTPException(status_code=404, detail="Run not found")
+                return RunProgressResponse.model_validate(progress)
+            except HTTPException:
+                raise
+            except Exception as exc:
+                raise HTTPException(status_code=500, detail="Unable to read run progress") from exc
 
     if resume_runner is not None:
         @app.post("/v1/runs/{run_id}/resume", response_model=RunResponse,
