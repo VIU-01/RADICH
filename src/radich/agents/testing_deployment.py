@@ -7,7 +7,12 @@ from __future__ import annotations
 
 import os
 
-from .service import build_m17_app
+
+def _build_m17_app(*, dsn: str, api_key: str, grant_skill: bool):
+    # PostgreSQL is an optional dependency in the baseline Python test job.
+    # Load it only after the testing gate and required settings are validated.
+    from .service import build_m17_app
+    return build_m17_app(dsn=dsn, api_key=api_key, grant_skill=grant_skill)
 
 
 def build_app():
@@ -22,4 +27,4 @@ def build_app():
 
     # This grant is server-side and limited to the offline text.normalize skill.
     # HTTP callers cannot choose an agent, grant permission or invoke other tools.
-    return build_m17_app(dsn=dsn, api_key=api_key, grant_skill=True)
+    return _build_m17_app(dsn=dsn, api_key=api_key, grant_skill=True)
