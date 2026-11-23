@@ -1,6 +1,6 @@
-# M18 — A01/M17.5: despliegue opcional para TESTING (Hosting.com / Linux)
+# M18 — A01/M17.5: despliegue para TESTING (VPS Linux contratado en my.hosting)
 
-**Estado actualizado (22/11/2026): M18 A01 TEST instalada y validada en sandbox.** PR #16 fusionada (commit `e566d59`), y actualización posterior M19.1 PR #18 fusionada (commit `4f504da`) **desplegada manualmente solo en A01**. CI de `main` 6/6 correctos; en el VPS M15/A01 `/health` OK y `/progress` A01 pasó 401/200/404. El texto siguiente conserva el procedimiento de **primera instalación** para trazabilidad; no volver a ejecutarlo como si el servicio aún no existiera.
+**Estado actualizado (23/11/2026): M18 A01 TEST instalada y validada en sandbox.** El usuario confirma la contratación final del VPS en **my.hosting**, de tipo equivalente al plan Hetzner inicialmente estudiado. El manual M18.3 utilizó «Hosting.com» como referencia histórica; no se presume identidad comercial entre marcas. No hay confirmación aquí del plan, región o precio.  PR #16 fusionada (commit `e566d59`), y actualización posterior M19.1 PR #18 fusionada (commit `4f504da`) **desplegada manualmente solo en A01**. CI de `main` 6/6 correctos; en el VPS M15/A01 `/health` OK y `/progress` A01 pasó 401/200/404. El texto siguiente conserva el procedimiento de **primera instalación** para trazabilidad; no volver a ejecutarlo como si el servicio aún no existiera.
 
 Esta microtarea activa de forma controlada el **agente simulado A01** (skill local `text.normalize`) y la persistencia/checkpoints M17.5 en un **segundo servicio independiente**. No hay LLM, acceso a herramientas externas, ni razonamiento autónomo.
 
