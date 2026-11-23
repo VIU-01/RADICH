@@ -1,6 +1,6 @@
 # RADICH
 
-RADICH Core — Python/FastAPI, grafo DAG nativo y PostgreSQL. A 22/11/2026 está desplegado **solo como sandbox de desarrollo** en un VPS Linux remoto: M15 demo y servicio independiente A01 simulado. No es un sistema productivo.
+RADICH Core — Python/FastAPI, grafo DAG nativo y PostgreSQL. Está desplegado **solo como sandbox de desarrollo** en un VPS Linux remoto, cuya contratación en **my.hosting** fue confirmada por el usuario el 23/11/2026; es del mismo tipo que el plan contemplado inicialmente en Hetzner. Los manuales iniciales M18 lo llaman «Hosting.com». M15 demo y A01 simulado permanecen independientes. No es un sistema productivo; no hay verificación documental de la marca comercial, plan exacto, región o precio.
 
 - Repositorio de código, CI y PR: [GitHub RADICH](https://github.com/VIU-01/RADICH).
 - Estado operativo y cronología comprobada: [Control maestro vigente en Drive](https://docs.google.com/document/d/18URU5hm6g8HwpNiLTEVP46sU2qNCB5b1IisjBYUkEys/edit).
