@@ -2,7 +2,7 @@
 
 ## Estado del sandbox e infraestructura (22/11/2026)
 
-- **RADICH se ejecuta en un VPS Linux remoto de pruebas identificado como Hosting.com en la guía M18.3 y en las sesiones PuTTY. NO se ejecuta en Windows.** Hetzner Cloud fue la elección de diseño del 01/11/2026; no confundirla con el alojamiento efectivo comprobado después.
+- **RADICH se ejecuta en un VPS Linux remoto de pruebas cuya contratación en my.hosting fue confirmada por el usuario el 23/11/2026, como alternativa del mismo tipo que la prevista en Hetzner. NO se ejecuta en Windows.** Hetzner Cloud fue la opción original de diseño (01/11), no el proveedor finalmente contratado. La denominación «Hosting.com» figura en manuales M18 históricos; no se presupone equivalencia jurídica de marcas ni se afirman características comerciales exactas sin contrato.
 - Docker Compose se ejecuta en **Linux remoto**, con servicios FastAPI/Python y PostgreSQL separados. M15 usa `127.0.0.1:8000`; A01 testing, `127.0.0.1:8001`, PostgreSQL y volumen independientes.
 - PostgreSQL usa volumen persistente y red privada Docker: **nunca publicar el puerto de PostgreSQL a Internet**.
 - Navegador/móvil con HTTPS y autenticación, SSH con claves y firewall son **objetivos de producción pendientes**, no características verificadas del sandbox actual. Las API de pruebas están ligadas a loopback y los secretos deben permanecer fuera del repositorio.

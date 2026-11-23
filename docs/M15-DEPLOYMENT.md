@@ -1,6 +1,6 @@
 # M15.2 — Docker Compose Linux (diseño original Hetzner; sandbox remoto actual)
 
-Original design target (01/11/2026): **Hetzner Cloud Linux**. Actual sandbox documented in M18.3 and tested via PuTTY on 22/11/2026: **remote Linux VPS at Hosting.com**. Do not infer the provider from the original M15 design. Windows/Docker Desktop is not the execution host. **M15 is already running** on loopback port 8000 with a private PostgreSQL; the steps below are the historical initial-install procedure, not an instruction to recreate it.
+Original design target (01/11/2026): **Hetzner Cloud Linux**. Actual sandbox: **remote Linux VPS contracted through my.hosting**, as confirmed by the user on 23/11/2026, of the same type as the previously considered Hetzner plan. The earlier M18.3 manual used the label **Hosting.com**; preserve that historical wording without assuming legal equivalence of brands. Do not infer exact commercial specifications or location from the design. Windows/Docker Desktop is not the execution host. **M15 is already running** on loopback port 8000 with a private PostgreSQL; the steps below are the historical initial-install procedure, not an instruction to recreate it.
 
 ## Components
 - `radich`: FastAPI and native Python DAG demo, accessible only on VPS loopback port 8000.
